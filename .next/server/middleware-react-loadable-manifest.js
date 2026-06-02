@@ -1,0 +1,1 @@
+self.__REACT_LOADABLE_MANIFEST='{"components\\\\ReiseDetailClient.tsx -> ./ReiseKarte":{"id":9794,"files":["static/chunks/d0deef33.afff9b3bf7059c8b.js","static/chunks/794.c107a4e0492656ee.js"]}}';
