@@ -6,8 +6,17 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: 'FamTrip – Familienreisen dokumentieren & teilen',
-  description: 'Entdecke und teile selbstorganisierte Familienreisen mit Kindern.',
+  description: 'Entdecke und teile selbstorganisierte Familienreisen mit Kindern. Routen, Kosten, Unterkünfte und Tipps der Community.',
   metadataBase: new URL('https://famtrip.looschen.net'),
+  themeColor: '#10B981',
+  openGraph: {
+    title: 'FamTrip – Familienreisen dokumentieren & teilen',
+    description: 'Von Familien für Familien – Routen, Kosten und Tipps.',
+    url: 'https://famtrip.looschen.net',
+    siteName: 'FamTrip',
+    locale: 'de_DE',
+    type: 'website',
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -30,9 +39,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   🗺️ FamTrip
                 </div>
                 <nav className="flex flex-wrap items-center gap-6 text-sm text-gray-500">
-                  <a href="/entdecken" className="hover:text-emerald-600 transition-colors">Entdecken</a>
-                  <a href="/karte" className="hover:text-emerald-600 transition-colors">Karte</a>
-                  <a href="/impressum" className="hover:text-emerald-600 transition-colors">Impressum</a>
+                  <a href="/entdecken"  className="hover:text-emerald-600 transition-colors">Entdecken</a>
+                  <a href="/karte"      className="hover:text-emerald-600 transition-colors">Karte</a>
+                  <a href="/impressum"  className="hover:text-emerald-600 transition-colors">Impressum</a>
                   <a href="/datenschutz" className="hover:text-emerald-600 transition-colors">Datenschutz</a>
                 </nav>
                 <p className="text-xs text-gray-400">
