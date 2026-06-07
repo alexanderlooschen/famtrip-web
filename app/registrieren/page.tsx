@@ -23,8 +23,8 @@ export default function RegistrierenPage() {
     setFehler('');
     setLaden(true);
 
-    const { error } = await signUp(email, passwort, name);
-    if (error) { setFehler(error); setLaden(false); return; }
+    const fehlerMsg = await signUp(email, passwort, name, anzeigename);
+    if (fehlerMsg) { setFehler(fehlerMsg); setLaden(false); return; }
 
     // Anzeigename direkt nach Registrierung setzen
     // (wird nach Email-Bestätigung aktiv – als Metadata mitgeben)
