@@ -8,21 +8,34 @@ import { supabase, Reise, Etappe, centZuEuro, dauerTage } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext';
 import Kommentare from './Kommentare';
 
-const ReiseKarte  = dynamic(() => import('./ReiseKarte'),  { ssr: false });
-const FotoUpload  = dynamic(() => import('./FotoUpload'),  { ssr: false });
+// Dynamische Imports (kein SSR)
+const ReiseKarte = dynamic(() => import('./ReiseKarte'),  { ssr: false });
+const FotoUpload = dynamic(() => import('./FotoUpload'),  { ssr: false });
 
 type KostenSicht = 'gesamt' | 'pro_person' | 'pro_tag';
-
 interface Foto { id: string; url: string; beschriftung: string | null; }
+
+const VM_ICON: Record<string, string> = {
+  Auto: '🚗', Bahn: '🚂', Fahrrad: '🚲', Fähre: '⛴️',
+  Flugzeug: '✈️', Bus: '🚌', Fuß: '🚶', Sonstiges: '🚀',
+};
+const UNTERKUNFT_ICON: Record<string, string> = {
+  Hotel: '🏨', Ferienwohnung: '🏠', Camping: '🏕️', Zelt: '⛺',
+  Jugendherberge: '🏫', Hostel: '🛏️', Bauernhof: '🐄',
+  Verwandte: '👨‍👩‍👧', Sonstiges: '🏠',
+};
+const JAHRESZEIT_ICON: Record<string, string> = {
+  'Frühling': '🌸', 'Sommer': '☀️', 'Herbst': '🍂', 'Winter': '❄️'
+};
 
 export default function ReiseDetailClient() {
   const { id } = useParams<{ id: string }>();
   const { session } = useAuth();
-  const [reise, setReise]       = useState<Reise | null>(null);
-  const [etappen, setEtappen]   = useState<Etappe[]>([]);
+  const [reise, setReise]           = useState<Reise | null>(null);
+  const [etappen, setEtappen]       = useState<Etappe[]>([]);
   const [reiseFotos, setReiseFotos] = useState<Foto[]>([]);
   const [etappenFotos, setEtappenFotos] = useState<Record<string, Foto[]>>({});
-  const [laden, setLaden]       = useState(true);
+  const [laden, setLaden]           = useState(true);
   const [kostenSicht, setKostenSicht] = useState<KostenSicht>('gesamt');
   const [aktiveEtappe, setAktiveEtappe] = useState<Etappe | null>(null);
 
@@ -34,10 +47,10 @@ export default function ReiseDetailClient() {
       supabase.from('fotos').select('*').eq('reise_id', id).is('etappe_id', null),
     ]).then(([r, e, f]) => {
       if (r.data) setReise(r.data as Reise);
+      if (f.data) setReiseFotos(f.data as Foto[]);
       if (e.data) {
         const etappenDaten = e.data as Etappe[];
         setEtappen(etappenDaten);
-        // Etappen-Fotos laden
         if (etappenDaten.length > 0) {
           supabase.from('fotos')
             .select('*')
@@ -54,7 +67,6 @@ export default function ReiseDetailClient() {
             });
         }
       }
-      if (f.data) setReiseFotos(f.data as Foto[]);
       setLaden(false);
     });
   }, [id]);
@@ -93,10 +105,6 @@ export default function ReiseDetailClient() {
   const reisemonat = new Date(reise.datum_von).toLocaleDateString('de-DE', {
     month: 'long', year: 'numeric'
   });
-
-  const JAHRESZEIT_ICON: Record<string, string> = {
-    'Frühling': '🌸', 'Sommer': '☀️', 'Herbst': '🍂', 'Winter': '❄️'
-  };
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-10">
@@ -154,7 +162,9 @@ export default function ReiseDetailClient() {
           { wert: centZuEuro(reise.gesamtkosten_cent), label: 'Gesamtkosten', gruen: true },
         ].map(k => (
           <div key={k.label} className="card p-4 text-center">
-            <p className={`text-xl font-semibold ${(k as any).gruen ? 'text-emerald-500' : 'text-gray-900'}`}>{k.wert}</p>
+            <p className={`text-xl font-semibold ${(k as any).gruen ? 'text-emerald-500' : 'text-gray-900'}`}>
+              {k.wert}
+            </p>
             <p className="text-xs text-gray-400 mt-1">{k.label}</p>
           </div>
         ))}
@@ -201,7 +211,7 @@ export default function ReiseDetailClient() {
                   aktiv={aktiveEtappe?.id === e.id}
                   fotos={etappenFotos[e.id] ?? []}
                   onFotosChange={fotos => setEtappenFotos(prev => ({ ...prev, [e.id]: fotos }))}
-                  istErsteller={istErsteller}
+                  session={session}
                   onClick={() => setAktiveEtappe(prev => prev?.id === e.id ? null : e)}
                 />
               ))}
@@ -216,7 +226,6 @@ export default function ReiseDetailClient() {
           <div className="card p-5">
             <Kommentare reiseId={reise.id} />
           </div>
-
         </div>
 
         {/* Sidebar */}
@@ -266,24 +275,11 @@ export default function ReiseDetailClient() {
 }
 
 // ── Etappen-Karte ─────────────────────────────────────────────
-const VM_ICON: Record<string, string> = {
-  Auto: '🚗', Bahn: '🚂', Fahrrad: '🚲', Fähre: '⛴️',
-  Flugzeug: '✈️', Bus: '🚌', Fuß: '🚶', Sonstiges: '🚀',
-};
-const UNTERKUNFT_ICON: Record<string, string> = {
-  Hotel: '🏨', Ferienwohnung: '🏠', Camping: '🏕️', Zelt: '⛺',
-  Jugendherberge: '🏫', Hostel: '🛏️', Bauernhof: '🐄',
-  Verwandte: '👨‍👩‍👧', Sonstiges: '🏠',
-};
-
-interface Foto { id: string; url: string; beschriftung: string | null; }
-
-function EtappeKarte({ etappe, nummer, aktiv, fotos, onFotosChange, istErsteller, onClick }: {
+function EtappeKarte({ etappe, nummer, aktiv, fotos, onFotosChange, session, onClick }: {
   etappe: Etappe; nummer: number; aktiv: boolean;
   fotos: Foto[]; onFotosChange: (f: Foto[]) => void;
-  istErsteller: boolean; onClick: () => void;
+  session: any; onClick: () => void;
 }) {
-  const { session } = useAuth();
   const e = etappe as any;
   const etappenTitel = (e.ort_von && e.ort_bis)
     ? `${e.ort_von} → ${e.ort_bis}`
@@ -291,7 +287,6 @@ function EtappeKarte({ etappe, nummer, aktiv, fotos, onFotosChange, istErsteller
 
   return (
     <div className={`card transition-all ${aktiv ? 'ring-2 ring-emerald-400' : ''}`}>
-      {/* Kopf – immer sichtbar */}
       <button onClick={onClick} className="w-full text-left p-4">
         <div className="flex items-start gap-3">
           <div className="w-8 h-8 rounded-full bg-emerald-500 text-white text-sm font-bold flex items-center justify-center flex-shrink-0">
@@ -323,14 +318,12 @@ function EtappeKarte({ etappe, nummer, aktiv, fotos, onFotosChange, istErsteller
               <p className="text-xs text-gray-400 mt-1">📷 {fotos.length} Foto{fotos.length !== 1 ? 's' : ''}</p>
             )}
           </div>
-          <span className="text-xs text-gray-400">{aktiv ? '▲' : '▼'}</span>
+          <span className="text-xs text-gray-400 flex-shrink-0">{aktiv ? '▲' : '▼'}</span>
         </div>
       </button>
 
-      {/* Detail – aufgeklappt */}
       {aktiv && (
         <div className="px-4 pb-4 border-t border-gray-50 pt-4 space-y-4">
-
           {/* Kosten */}
           {etappe.kosten_gesamt_cent > 0 && (
             <div className="grid grid-cols-2 gap-2">
@@ -347,7 +340,6 @@ function EtappeKarte({ etappe, nummer, aktiv, fotos, onFotosChange, istErsteller
               ))}
             </div>
           )}
-
           {/* Tipps */}
           {etappe.tipps && (
             <div className="bg-amber-50 rounded-lg px-3 py-2.5 border border-amber-100">
@@ -355,8 +347,7 @@ function EtappeKarte({ etappe, nummer, aktiv, fotos, onFotosChange, istErsteller
               <p className="text-xs text-amber-800 leading-relaxed">{etappe.tipps}</p>
             </div>
           )}
-
-          {/* Fotos der Etappe */}
+          {/* Fotos */}
           <div>
             <p className="text-sm font-medium text-gray-700 mb-2">📷 Fotos dieser Etappe</p>
             <FotoUpload
@@ -371,7 +362,3 @@ function EtappeKarte({ etappe, nummer, aktiv, fotos, onFotosChange, istErsteller
     </div>
   );
 }
-
-// Dynamischer Import für FotoUpload innerhalb der Etappe
-import dynamic from 'next/dynamic';
-const FotoUpload = dynamic(() => import('./FotoUpload'), { ssr: false });
