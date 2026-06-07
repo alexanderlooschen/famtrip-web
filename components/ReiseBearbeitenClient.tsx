@@ -1,6 +1,13 @@
 // components/ReiseBearbeitenClient.tsx
 'use client';
 
+function monatZuJahreszeit(monat: number): string {
+  if ([12,1,2].includes(monat))  return 'Winter';
+  if ([3,4,5].includes(monat))   return 'Frühling';
+  if ([6,7,8].includes(monat))   return 'Sommer';
+  return 'Herbst';
+}
+
 import { useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useAuth } from '../context/AuthContext';
@@ -12,7 +19,7 @@ const JAHRE = Array.from({length: 10}, (_, i) => new Date().getFullYear() - i);
 const UNTERKUNFT_TYPEN = ['Hotel','Ferienwohnung','Camping','Zelt','Jugendherberge',
   'Hostel','Bauernhof','Verwandte','Sonstiges'];
 const VERKEHRSMITTEL = ['Auto','Bahn','Fahrrad','Fähre','Flugzeug','Bus','Fuß','Sonstiges'];
-const JAHRESZEITEN = ['Frühling','Sommer','Herbst','Winter'];
+
 
 const euroCent = (v: string) => Math.round((parseFloat(v.replace(',','.')) || 0) * 100);
 
@@ -118,7 +125,7 @@ export default function ReiseBearbeitenClient() {
       personen_anzahl: parseInt(personen) || 2,
       kinder_alter_min: kinderMin ? parseInt(kinderMin) : null,
       kinder_alter_max: kinderMax ? parseInt(kinderMax) : null,
-      jahreszeit: jahreszeit || null,
+      jahreszeit: monatZuJahreszeit(parseInt(monat)),
     }).eq('id', reiseId);
 
     if (error) { setFehler(error.message); return; }

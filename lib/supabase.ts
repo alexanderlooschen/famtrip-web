@@ -83,3 +83,12 @@ export const datumDE = (iso: string): string =>
 
 export const dauerTage = (von: string, bis: string): number =>
   Math.round((new Date(bis).getTime() - new Date(von).getTime()) / 86_400_000) + 1;
+
+// Monat (1-12) → Jahreszeit automatisch
+export function monatZuJahreszeit(monat: number): string {
+  if ([12,1,2].includes(monat))  return "Winter";
+  if ([3,4,5].includes(monat))   return "Frühling";
+  if ([6,7,8].includes(monat))   return "Sommer";
+  return "Herbst";
+}
+

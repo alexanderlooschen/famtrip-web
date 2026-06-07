@@ -14,26 +14,30 @@ const JAHRE = Array.from({length: 10}, (_, i) => new Date().getFullYear() - i);
 const VERKEHRSMITTEL = ['Auto','Bahn','Fahrrad','Fähre','Flugzeug','Bus','Fuß','Sonstiges'];
 const UNTERKUNFT_TYPEN = ['Hotel','Ferienwohnung','Camping','Zelt','Jugendherberge',
   'Hostel','Bauernhof','Verwandte','Sonstiges'];
-const JAHRESZEITEN = ['Frühling','Sommer','Herbst','Winter'];
+
+// Monat → Jahreszeit automatisch
+function monatZuJahreszeit(monat: number): string {
+  if ([12,1,2].includes(monat))  return 'Winter';
+  if ([3,4,5].includes(monat))   return 'Frühling';
+  if ([6,7,8].includes(monat))   return 'Sommer';
+  return 'Herbst';
+}
+
+const JAHRESZEIT_ICON: Record<string, string> = {
+  'Frühling': '🌸', 'Sommer': '☀️', 'Herbst': '🍂', 'Winter': '❄️'
+};
 
 interface EtappeFormular {
-  ort_von: string;
-  ort_bis: string;
+  ort_von: string; ort_bis: string;
   verkehrsmittel: string[];
-  unterkunft_typ: string;
-  unterkunft_name: string;
-  kosten_unterkunft: string;
-  kosten_transport: string;
-  kosten_verpflegung: string;
-  kosten_aktivitaeten: string;
-  kosten_sonstiges: string;
-  tipps: string;
-  kinderwagen: string;
+  unterkunft_typ: string; unterkunft_name: string;
+  kosten_unterkunft: string; kosten_transport: string;
+  kosten_verpflegung: string; kosten_aktivitaeten: string;
+  kosten_sonstiges: string; tipps: string; kinderwagen: string;
 }
 
 const leerEtappe = (ort_von = ''): EtappeFormular => ({
-  ort_von, ort_bis: '',
-  verkehrsmittel: [],
+  ort_von, ort_bis: '', verkehrsmittel: [],
   unterkunft_typ: '', unterkunft_name: '',
   kosten_unterkunft: '', kosten_transport: '',
   kosten_verpflegung: '', kosten_aktivitaeten: '',
@@ -41,7 +45,6 @@ const leerEtappe = (ort_von = ''): EtappeFormular => ({
 });
 
 const euroCent = (v: string) => Math.round((parseFloat(v.replace(',','.')) || 0) * 100);
-
 const etappeGesamt = (e: EtappeFormular) =>
   ['kosten_unterkunft','kosten_transport','kosten_verpflegung','kosten_aktivitaeten','kosten_sonstiges']
     .reduce((s, k) => s + (parseFloat((e as any)[k].replace(',','.')) || 0), 0);
@@ -67,18 +70,19 @@ export default function ReiseNeuClient() {
   const [fehler, setFehler]   = useState('');
   const [reiseId, setReiseId] = useState<string | null>(null);
 
-  // Basisdaten
   const [titel, setTitel]               = useState('');
   const [beschreibung, setBeschreibung] = useState('');
   const [gesamtkommentar, setGesamtkommentar] = useState('');
   const [monat, setMonat]               = useState(String(new Date().getMonth() + 1));
   const [jahr, setJahr]                 = useState(String(new Date().getFullYear()));
-  const [dauerTage, setDauerTage]       = useState('');
+  const [dauerTageVal, setDauerTageVal] = useState('');
   const [personen, setPersonen]         = useState('2');
   const [kinderMin, setKinderMin]       = useState('');
   const [kinderMax, setKinderMax]       = useState('');
-  const [jahreszeit, setJahreszeit]     = useState('');
   const [etappen, setEtappen]           = useState<EtappeFormular[]>([leerEtappe()]);
+
+  // Jahreszeit automatisch aus Monat
+  const jahreszeit = monatZuJahreszeit(parseInt(monat));
 
   if (!session) return (
     <div className="min-h-screen flex items-center justify-center px-4">
@@ -93,6 +97,7 @@ export default function ReiseNeuClient() {
   const basisSpeichern = async () => {
     if (!titel) { setFehler('Bitte einen Titel eingeben.'); return; }
     setFehler(''); setLaden(true);
+
     const monatNum   = parseInt(monat) || 1;
     const jahrNum    = parseInt(jahr);
     const datumVon   = `${jahrNum}-${String(monatNum).padStart(2,'0')}-01`;
@@ -100,17 +105,17 @@ export default function ReiseNeuClient() {
     const datumBis   = `${jahrNum}-${String(monatNum).padStart(2,'0')}-${letzterTag}`;
 
     const { data, error } = await supabase.from('reisen').insert({
-      ersteller_id:    session.user.id,
+      ersteller_id:     session.user.id,
       titel,
-      beschreibung:    beschreibung || null,
-      gesamtkommentar: gesamtkommentar || null,
-      datum_von:       datumVon,
-      datum_bis:       datumBis,
-      dauer_tage:      dauerTage ? parseInt(dauerTage) : null,
-      personen_anzahl: parseInt(personen) || 2,
+      beschreibung:     beschreibung || null,
+      gesamtkommentar:  gesamtkommentar || null,
+      datum_von:        datumVon,
+      datum_bis:        datumBis,
+      dauer_tage:       dauerTageVal ? parseInt(dauerTageVal) : null,
+      personen_anzahl:  parseInt(personen) || 2,
       kinder_alter_min: kinderMin ? parseInt(kinderMin) : null,
       kinder_alter_max: kinderMax ? parseInt(kinderMax) : null,
-      jahreszeit:       jahreszeit || null,
+      jahreszeit,                         // automatisch berechnet
       veroeffentlicht:  false,
     }).select('id').single();
 
@@ -123,12 +128,19 @@ export default function ReiseNeuClient() {
   const etappenSpeichern = async () => {
     if (!reiseId) return;
     const ungueltig = etappen.find(e => !e.ort_von || !e.ort_bis || e.verkehrsmittel.length === 0);
-    if (ungueltig) { setFehler('Bitte bei allen Etappen Von-Ort, Bis-Ort und Verkehrsmittel angeben.'); return; }
+    if (ungueltig) {
+      setFehler('Bitte bei allen Etappen Von-Ort, Bis-Ort und Verkehrsmittel angeben.');
+      return;
+    }
     setFehler(''); setLaden(true);
 
-    // Alle Orte geocodieren
     const geoVon = await Promise.all(etappen.map(e => geocodeOrt(e.ort_von)));
     const geoBis = await Promise.all(etappen.map(e => geocodeOrt(e.ort_bis)));
+
+    const monatNum = parseInt(monat) || 1;
+    const jahrNum  = parseInt(jahr);
+    const datumVon = `${jahrNum}-${String(monatNum).padStart(2,'0')}-01`;
+    const datumBis = `${jahrNum}-${String(monatNum).padStart(2,'0')}-${new Date(jahrNum, monatNum, 0).getDate()}`;
 
     const rows = etappen.map((e, idx) => ({
       reise_id:                reiseId,
@@ -144,8 +156,8 @@ export default function ReiseNeuClient() {
       lng_von:                 geoVon[idx].lng,
       lat_bis:                 geoBis[idx].lat,
       lng_bis:                 geoBis[idx].lng,
-      datum_von:               `${parseInt(jahr)}-${String(parseInt(monat)).padStart(2,'0')}-01`,
-      datum_bis:               `${parseInt(jahr)}-${String(parseInt(monat)).padStart(2,'0')}-${new Date(parseInt(jahr), parseInt(monat), 0).getDate()}`,
+      datum_von:               datumVon,
+      datum_bis:               datumBis,
       verkehrsmittel:          e.verkehrsmittel,
       unterkunft_typ:          e.unterkunft_typ || null,
       unterkunft_name:         e.unterkunft_name || null,
@@ -183,9 +195,8 @@ export default function ReiseNeuClient() {
       : e));
 
   const etappeHinzufuegen = () => {
-    // Von-Ort der neuen Etappe = Bis-Ort der letzten Etappe
-    const letzteEtappe = etappen[etappen.length - 1];
-    setEtappen(prev => [...prev, leerEtappe(letzteEtappe?.ort_bis ?? '')]);
+    const letzte = etappen[etappen.length - 1];
+    setEtappen(prev => [...prev, leerEtappe(letzte?.ort_bis ?? '')]);
   };
 
   const schrittIdx = ['basis','etappe','fertig'].indexOf(schritt);
@@ -209,7 +220,9 @@ export default function ReiseNeuClient() {
       </div>
 
       {fehler && (
-        <div className="bg-red-50 border border-red-100 text-red-600 text-sm rounded-xl px-4 py-3 mb-6">{fehler}</div>
+        <div className="bg-red-50 border border-red-100 text-red-600 text-sm rounded-xl px-4 py-3 mb-6">
+          {fehler}
+        </div>
       )}
 
       {/* ── SCHRITT 1: Basisdaten ── */}
@@ -222,7 +235,8 @@ export default function ReiseNeuClient() {
 
           <Feld label="Kurzbeschreibung">
             <textarea value={beschreibung} onChange={e => setBeschreibung(e.target.value)}
-              rows={2} placeholder="Was macht diese Reise besonders?" className="eingabe resize-none" />
+              rows={2} placeholder="Was macht diese Reise besonders?"
+              className="eingabe resize-none" />
           </Feld>
 
           <Feld label="Gesamtfazit (kann auch später ergänzt werden)">
@@ -231,6 +245,7 @@ export default function ReiseNeuClient() {
               className="eingabe resize-none" />
           </Feld>
 
+          {/* Monat + Jahr – Jahreszeit automatisch */}
           <div className="grid grid-cols-2 gap-4">
             <Feld label="Reisemonat *">
               <select value={monat} onChange={e => setMonat(e.target.value)} className="eingabe">
@@ -244,12 +259,17 @@ export default function ReiseNeuClient() {
             </Feld>
           </div>
 
+          {/* Jahreszeit automatisch anzeigen */}
+          <div className="bg-gray-50 rounded-xl px-4 py-3 border border-gray-100 text-sm text-gray-600 flex items-center gap-2">
+            <span className="text-lg">{JAHRESZEIT_ICON[jahreszeit]}</span>
+            <span>Jahreszeit: <strong>{jahreszeit}</strong> (automatisch aus Monat)</span>
+          </div>
+
           <div className="grid grid-cols-3 gap-4">
             <Feld label="Reisedauer (Tage) *">
-              <input type="number" min="1" max="365" value={dauerTage}
-                onChange={e => setDauerTage(e.target.value)}
+              <input type="number" min="1" max="365" value={dauerTageVal}
+                onChange={e => setDauerTageVal(e.target.value)}
                 placeholder="z. B. 7" className="eingabe" />
-              <p className="text-xs text-gray-400 mt-1">Für Kosten pro Tag</p>
             </Feld>
             <Feld label="Personen *">
               <input type="number" min="1" max="20" value={personen}
@@ -261,20 +281,13 @@ export default function ReiseNeuClient() {
             </Feld>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <Feld label="Kinder bis (J.)">
-              <input type="number" min="0" max="17" value={kinderMax}
-                onChange={e => setKinderMax(e.target.value)} placeholder="12" className="eingabe" />
-            </Feld>
-            <Feld label="Jahreszeit">
-              <select value={jahreszeit} onChange={e => setJahreszeit(e.target.value)} className="eingabe">
-                <option value="">-- wählen --</option>
-                {JAHRESZEITEN.map(j => <option key={j}>{j}</option>)}
-              </select>
-            </Feld>
-          </div>
+          <Feld label="Kinder bis (J.)">
+            <input type="number" min="0" max="17" value={kinderMax}
+              onChange={e => setKinderMax(e.target.value)} placeholder="12" className="eingabe w-1/3" />
+          </Feld>
 
-          <button onClick={basisSpeichern} disabled={laden} className="btn-primary w-full py-3 text-base">
+          <button onClick={basisSpeichern} disabled={laden}
+            className="btn-primary w-full py-3 text-base">
             {laden ? 'Speichern ...' : 'Weiter: Etappen →'}
           </button>
         </div>
@@ -299,13 +312,15 @@ export default function ReiseNeuClient() {
                   )}
                 </h3>
                 {etappen.length > 1 && (
-                  <button onClick={() => setEtappen(prev => prev.filter((_, i) => i !== idx))}
-                    className="text-xs text-red-400 hover:text-red-600">entfernen</button>
+                  <button
+                    onClick={() => setEtappen(prev => prev.filter((_, i) => i !== idx))}
+                    className="text-xs text-red-400 hover:text-red-600">
+                    entfernen
+                  </button>
                 )}
               </div>
 
               <div className="space-y-4">
-                {/* Von / Bis */}
                 <div className="grid grid-cols-2 gap-3">
                   <Feld label="Von (Startort) *">
                     <input value={etappe.ort_von}
@@ -316,7 +331,6 @@ export default function ReiseNeuClient() {
                     <input value={etappe.ort_bis}
                       onChange={e => {
                         updateEtappe(idx,'ort_bis',e.target.value);
-                        // Nächste Etappe vorbelegen wenn sie leer ist
                         if (etappen[idx+1] && !etappen[idx+1].ort_von) {
                           updateEtappe(idx+1,'ort_von',e.target.value);
                         }
@@ -429,7 +443,8 @@ export default function ReiseNeuClient() {
             Deine Reise ist als Entwurf gespeichert. Möchtest du sie jetzt veröffentlichen?
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <button onClick={veroeffentlichen} disabled={laden} className="btn-primary px-8 py-3 text-base">
+            <button onClick={veroeffentlichen} disabled={laden}
+              className="btn-primary px-8 py-3 text-base">
               {laden ? 'Wird veröffentlicht ...' : '🌍 Jetzt veröffentlichen'}
             </button>
             <a href={`/reise/${reiseId}`} className="btn-ghost px-8 py-3 text-base text-center">
