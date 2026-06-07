@@ -17,20 +17,27 @@ const UNTERKUNFT_TYPEN = ['Hotel','Ferienwohnung','Camping','Zelt','Jugendherber
 const JAHRESZEITEN = ['Frühling','Sommer','Herbst','Winter'];
 
 interface EtappeFormular {
-  titel: string; ort: string;
+  ort_von: string;
+  ort_bis: string;
   verkehrsmittel: string[];
-  unterkunft_typ: string; unterkunft_name: string;
-  kosten_unterkunft: string; kosten_transport: string;
-  kosten_verpflegung: string; kosten_aktivitaeten: string;
-  kosten_sonstiges: string; tipps: string; kinderwagen: string;
+  unterkunft_typ: string;
+  unterkunft_name: string;
+  kosten_unterkunft: string;
+  kosten_transport: string;
+  kosten_verpflegung: string;
+  kosten_aktivitaeten: string;
+  kosten_sonstiges: string;
+  tipps: string;
+  kinderwagen: string;
 }
 
-const leerEtappe = (): EtappeFormular => ({
-  titel:'', ort:'', verkehrsmittel:[],
-  unterkunft_typ:'', unterkunft_name:'',
-  kosten_unterkunft:'', kosten_transport:'',
-  kosten_verpflegung:'', kosten_aktivitaeten:'',
-  kosten_sonstiges:'', tipps:'', kinderwagen:'',
+const leerEtappe = (ort_von = ''): EtappeFormular => ({
+  ort_von, ort_bis: '',
+  verkehrsmittel: [],
+  unterkunft_typ: '', unterkunft_name: '',
+  kosten_unterkunft: '', kosten_transport: '',
+  kosten_verpflegung: '', kosten_aktivitaeten: '',
+  kosten_sonstiges: '', tipps: '', kinderwagen: '',
 });
 
 const euroCent = (v: string) => Math.round((parseFloat(v.replace(',','.')) || 0) * 100);
@@ -40,6 +47,7 @@ const etappeGesamt = (e: EtappeFormular) =>
     .reduce((s, k) => s + (parseFloat((e as any)[k].replace(',','.')) || 0), 0);
 
 async function geocodeOrt(ort: string): Promise<{lat: number|null, lng: number|null}> {
+  if (!ort.trim()) return { lat: null, lng: null };
   try {
     const res = await fetch(
       `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(ort)}&format=json&limit=1`,
@@ -59,11 +67,13 @@ export default function ReiseNeuClient() {
   const [fehler, setFehler]   = useState('');
   const [reiseId, setReiseId] = useState<string | null>(null);
 
+  // Basisdaten
   const [titel, setTitel]               = useState('');
   const [beschreibung, setBeschreibung] = useState('');
   const [gesamtkommentar, setGesamtkommentar] = useState('');
   const [monat, setMonat]               = useState(String(new Date().getMonth() + 1));
   const [jahr, setJahr]                 = useState(String(new Date().getFullYear()));
+  const [dauerTage, setDauerTage]       = useState('');
   const [personen, setPersonen]         = useState('2');
   const [kinderMin, setKinderMin]       = useState('');
   const [kinderMax, setKinderMax]       = useState('');
@@ -83,23 +93,27 @@ export default function ReiseNeuClient() {
   const basisSpeichern = async () => {
     if (!titel) { setFehler('Bitte einen Titel eingeben.'); return; }
     setFehler(''); setLaden(true);
-    const monatNum = parseInt(monat) || 1;
-    const jahrNum  = parseInt(jahr);
-    const datumVon = `${jahrNum}-${String(monatNum).padStart(2,'0')}-01`;
+    const monatNum   = parseInt(monat) || 1;
+    const jahrNum    = parseInt(jahr);
+    const datumVon   = `${jahrNum}-${String(monatNum).padStart(2,'0')}-01`;
     const letzterTag = new Date(jahrNum, monatNum, 0).getDate();
-    const datumBis = `${jahrNum}-${String(monatNum).padStart(2,'0')}-${letzterTag}`;
+    const datumBis   = `${jahrNum}-${String(monatNum).padStart(2,'0')}-${letzterTag}`;
 
     const { data, error } = await supabase.from('reisen').insert({
-      ersteller_id: session.user.id,
-      titel, beschreibung: beschreibung || null,
+      ersteller_id:    session.user.id,
+      titel,
+      beschreibung:    beschreibung || null,
       gesamtkommentar: gesamtkommentar || null,
-      datum_von: datumVon, datum_bis: datumBis,
+      datum_von:       datumVon,
+      datum_bis:       datumBis,
+      dauer_tage:      dauerTage ? parseInt(dauerTage) : null,
       personen_anzahl: parseInt(personen) || 2,
       kinder_alter_min: kinderMin ? parseInt(kinderMin) : null,
       kinder_alter_max: kinderMax ? parseInt(kinderMax) : null,
-      jahreszeit: jahreszeit || null,
-      veroeffentlicht: false,
+      jahreszeit:       jahreszeit || null,
+      veroeffentlicht:  false,
     }).select('id').single();
+
     setLaden(false);
     if (error) { setFehler(error.message); return; }
     setReiseId(data.id);
@@ -108,32 +122,40 @@ export default function ReiseNeuClient() {
 
   const etappenSpeichern = async () => {
     if (!reiseId) return;
-    const ungueltig = etappen.find(e => !e.titel || !e.ort || e.verkehrsmittel.length === 0);
-    if (ungueltig) { setFehler('Bitte alle Etappen vollständig ausfüllen (Titel, Ort, Verkehrsmittel).'); return; }
+    const ungueltig = etappen.find(e => !e.ort_von || !e.ort_bis || e.verkehrsmittel.length === 0);
+    if (ungueltig) { setFehler('Bitte bei allen Etappen Von-Ort, Bis-Ort und Verkehrsmittel angeben.'); return; }
     setFehler(''); setLaden(true);
 
-    // Alle Orte gleichzeitig geocodieren
-    const koordinaten = await Promise.all(etappen.map(e => geocodeOrt(e.ort)));
+    // Alle Orte geocodieren
+    const geoVon = await Promise.all(etappen.map(e => geocodeOrt(e.ort_von)));
+    const geoBis = await Promise.all(etappen.map(e => geocodeOrt(e.ort_bis)));
 
     const rows = etappen.map((e, idx) => ({
-      reise_id: reiseId,
-      ersteller_id: session.user.id,
-      reihenfolge: idx + 1,
-      titel: e.titel, ort: e.ort,
-      lat: koordinaten[idx].lat,
-      lng: koordinaten[idx].lng,
-      datum_von: `${parseInt(jahr)}-${String(parseInt(monat)).padStart(2,'0')}-01`,
-      datum_bis: `${parseInt(jahr)}-${String(parseInt(monat)).padStart(2,'0')}-${new Date(parseInt(jahr), parseInt(monat), 0).getDate()}`,
-      verkehrsmittel: e.verkehrsmittel,
-      unterkunft_typ: e.unterkunft_typ || null,
-      unterkunft_name: e.unterkunft_name || null,
+      reise_id:                reiseId,
+      ersteller_id:            session.user.id,
+      reihenfolge:             idx + 1,
+      titel:                   `${e.ort_von} → ${e.ort_bis}`,
+      ort:                     e.ort_von,
+      ort_von:                 e.ort_von,
+      ort_bis:                 e.ort_bis,
+      lat:                     geoVon[idx].lat,
+      lng:                     geoVon[idx].lng,
+      lat_von:                 geoVon[idx].lat,
+      lng_von:                 geoVon[idx].lng,
+      lat_bis:                 geoBis[idx].lat,
+      lng_bis:                 geoBis[idx].lng,
+      datum_von:               `${parseInt(jahr)}-${String(parseInt(monat)).padStart(2,'0')}-01`,
+      datum_bis:               `${parseInt(jahr)}-${String(parseInt(monat)).padStart(2,'0')}-${new Date(parseInt(jahr), parseInt(monat), 0).getDate()}`,
+      verkehrsmittel:          e.verkehrsmittel,
+      unterkunft_typ:          e.unterkunft_typ || null,
+      unterkunft_name:         e.unterkunft_name || null,
       kosten_unterkunft_cent:  euroCent(e.kosten_unterkunft),
       kosten_transport_cent:   euroCent(e.kosten_transport),
       kosten_verpflegung_cent: euroCent(e.kosten_verpflegung),
       kosten_aktivitaeten_cent:euroCent(e.kosten_aktivitaeten),
       kosten_sonstiges_cent:   euroCent(e.kosten_sonstiges),
-      tipps: e.tipps || null,
-      kinderwagen_geeignet: e.kinderwagen === 'ja' ? true : e.kinderwagen === 'nein' ? false : null,
+      tipps:                   e.tipps || null,
+      kinderwagen_geeignet:    e.kinderwagen === 'ja' ? true : e.kinderwagen === 'nein' ? false : null,
     }));
 
     const { error } = await supabase.from('etappen').insert(rows);
@@ -160,6 +182,12 @@ export default function ReiseNeuClient() {
           : [...e.verkehrsmittel, vm] }
       : e));
 
+  const etappeHinzufuegen = () => {
+    // Von-Ort der neuen Etappe = Bis-Ort der letzten Etappe
+    const letzteEtappe = etappen[etappen.length - 1];
+    setEtappen(prev => [...prev, leerEtappe(letzteEtappe?.ort_bis ?? '')]);
+  };
+
   const schrittIdx = ['basis','etappe','fertig'].indexOf(schritt);
 
   return (
@@ -184,24 +212,25 @@ export default function ReiseNeuClient() {
         <div className="bg-red-50 border border-red-100 text-red-600 text-sm rounded-xl px-4 py-3 mb-6">{fehler}</div>
       )}
 
-      {/* SCHRITT 1 */}
+      {/* ── SCHRITT 1: Basisdaten ── */}
       {schritt === 'basis' && (
         <div className="space-y-5">
           <Feld label="Reise-Titel *">
             <input value={titel} onChange={e => setTitel(e.target.value)}
               placeholder="z. B. Radtour Osnabrücker Land" className="eingabe" />
           </Feld>
+
           <Feld label="Kurzbeschreibung">
             <textarea value={beschreibung} onChange={e => setBeschreibung(e.target.value)}
               rows={2} placeholder="Was macht diese Reise besonders?" className="eingabe resize-none" />
           </Feld>
+
           <Feld label="Gesamtfazit (kann auch später ergänzt werden)">
             <textarea value={gesamtkommentar} onChange={e => setGesamtkommentar(e.target.value)}
               rows={3} placeholder="Wie war die Reise insgesamt? Was würdet ihr empfehlen?"
               className="eingabe resize-none" />
           </Feld>
 
-          {/* Monat + Jahr statt exaktem Datum */}
           <div className="grid grid-cols-2 gap-4">
             <Feld label="Reisemonat *">
               <select value={monat} onChange={e => setMonat(e.target.value)} className="eingabe">
@@ -216,6 +245,12 @@ export default function ReiseNeuClient() {
           </div>
 
           <div className="grid grid-cols-3 gap-4">
+            <Feld label="Reisedauer (Tage) *">
+              <input type="number" min="1" max="365" value={dauerTage}
+                onChange={e => setDauerTage(e.target.value)}
+                placeholder="z. B. 7" className="eingabe" />
+              <p className="text-xs text-gray-400 mt-1">Für Kosten pro Tag</p>
+            </Feld>
             <Feld label="Personen *">
               <input type="number" min="1" max="20" value={personen}
                 onChange={e => setPersonen(e.target.value)} className="eingabe" />
@@ -224,24 +259,20 @@ export default function ReiseNeuClient() {
               <input type="number" min="0" max="17" value={kinderMin}
                 onChange={e => setKinderMin(e.target.value)} placeholder="0" className="eingabe" />
             </Feld>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
             <Feld label="Kinder bis (J.)">
               <input type="number" min="0" max="17" value={kinderMax}
                 onChange={e => setKinderMax(e.target.value)} placeholder="12" className="eingabe" />
             </Feld>
+            <Feld label="Jahreszeit">
+              <select value={jahreszeit} onChange={e => setJahreszeit(e.target.value)} className="eingabe">
+                <option value="">-- wählen --</option>
+                {JAHRESZEITEN.map(j => <option key={j}>{j}</option>)}
+              </select>
+            </Feld>
           </div>
-
-          <Feld label="Jahreszeit">
-            <div className="flex gap-2 flex-wrap">
-              {JAHRESZEITEN.map(j => (
-                <button key={j} type="button"
-                  onClick={() => setJahreszeit(prev => prev === j ? '' : j)}
-                  className={`px-4 py-2 rounded-xl text-sm border transition-all ${
-                    jahreszeit === j ? 'bg-emerald-500 text-white border-emerald-500'
-                      : 'bg-white text-gray-600 border-gray-200 hover:border-emerald-300'
-                  }`}>{j}</button>
-              ))}
-            </div>
-          </Feld>
 
           <button onClick={basisSpeichern} disabled={laden} className="btn-primary w-full py-3 text-base">
             {laden ? 'Speichern ...' : 'Weiter: Etappen →'}
@@ -249,30 +280,48 @@ export default function ReiseNeuClient() {
         </div>
       )}
 
-      {/* SCHRITT 2 */}
+      {/* ── SCHRITT 2: Etappen ── */}
       {schritt === 'etappe' && (
         <div>
+          <div className="bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3 mb-5 text-sm text-emerald-700">
+            💡 Gib für jede Etappe den Startort und das Ziel ein. Ab der zweiten Etappe wird der Startort automatisch vorbelegt.
+          </div>
+
           {etappen.map((etappe, idx) => (
             <div key={idx} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-5">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-gray-900">Etappe {idx + 1}</h3>
+                <h3 className="font-semibold text-gray-900">
+                  Etappe {idx + 1}
+                  {etappe.ort_von && etappe.ort_bis && (
+                    <span className="text-gray-400 font-normal text-sm ml-2">
+                      {etappe.ort_von} → {etappe.ort_bis}
+                    </span>
+                  )}
+                </h3>
                 {etappen.length > 1 && (
                   <button onClick={() => setEtappen(prev => prev.filter((_, i) => i !== idx))}
                     className="text-xs text-red-400 hover:text-red-600">entfernen</button>
                 )}
               </div>
+
               <div className="space-y-4">
+                {/* Von / Bis */}
                 <div className="grid grid-cols-2 gap-3">
-                  <Feld label="Titel *">
-                    <input value={etappe.titel}
-                      onChange={e => updateEtappe(idx,'titel',e.target.value)}
-                      placeholder="z. B. Ankunft Osnabrück" className="eingabe" />
-                  </Feld>
-                  <Feld label="Ort *">
-                    <input value={etappe.ort}
-                      onChange={e => updateEtappe(idx,'ort',e.target.value)}
+                  <Feld label="Von (Startort) *">
+                    <input value={etappe.ort_von}
+                      onChange={e => updateEtappe(idx,'ort_von',e.target.value)}
                       placeholder="z. B. Osnabrück" className="eingabe" />
-                    <p className="text-xs text-gray-400 mt-1">Wird automatisch auf Karte eingetragen</p>
+                  </Feld>
+                  <Feld label="Bis (Zielort) *">
+                    <input value={etappe.ort_bis}
+                      onChange={e => {
+                        updateEtappe(idx,'ort_bis',e.target.value);
+                        // Nächste Etappe vorbelegen wenn sie leer ist
+                        if (etappen[idx+1] && !etappen[idx+1].ort_von) {
+                          updateEtappe(idx+1,'ort_von',e.target.value);
+                        }
+                      }}
+                      placeholder="z. B. Wallenhorst" className="eingabe" />
                   </Feld>
                 </div>
 
@@ -357,7 +406,7 @@ export default function ReiseNeuClient() {
             </div>
           ))}
 
-          <button onClick={() => setEtappen(prev => [...prev, leerEtappe()])}
+          <button onClick={etappeHinzufuegen}
             className="w-full border-2 border-dashed border-emerald-200 hover:border-emerald-400 rounded-xl p-3 text-sm text-emerald-500 hover:text-emerald-700 transition-colors mb-5">
             + Weitere Etappe
           </button>
@@ -371,7 +420,7 @@ export default function ReiseNeuClient() {
         </div>
       )}
 
-      {/* SCHRITT 3 */}
+      {/* ── SCHRITT 3: Fertig ── */}
       {schritt === 'fertig' && (
         <div className="text-center py-8">
           <span className="text-6xl block mb-4">🎉</span>

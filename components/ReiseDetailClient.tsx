@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
-import { supabase, Reise, Etappe, centZuEuro, datumDE, dauerTage } from '../lib/supabase';
+import { supabase, Reise, Etappe, centZuEuro, dauerTage } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 
 const ReiseKarte = dynamic(() => import('./ReiseKarte'), { ssr: false });
@@ -47,11 +47,14 @@ export default function ReiseDetailClient() {
     <p className="p-10 text-center text-gray-400">Reise nicht gefunden.</p>
   );
 
-  const dauer = dauerTage(reise.datum_von, reise.datum_bis);
   const istErsteller = session?.user?.id === reise.ersteller_id;
 
+  // Reisedauer: erst dauer_tage aus DB, dann aus datum_von/bis berechnen
+  const dauer = (reise as any).dauer_tage
+    ?? dauerTage(reise.datum_von, reise.datum_bis);
+
   const kostenWert = (cent: number) => {
-    if (kostenSicht === 'pro_person') return centZuEuro(Math.round(cent / reise.personen_anzahl));
+    if (kostenSicht === 'pro_person') return centZuEuro(Math.round(cent / Math.max(reise.personen_anzahl, 1)));
     if (kostenSicht === 'pro_tag')    return centZuEuro(Math.round(cent / Math.max(dauer, 1)));
     return centZuEuro(cent);
   };
@@ -67,8 +70,9 @@ export default function ReiseDetailClient() {
     { icon: '📦', label: 'Sonstiges',    cent: summe('kosten_sonstiges_cent') },
   ];
 
-  // Reisemonat aus datum_von
-  const reisemonat = new Date(reise.datum_von).toLocaleDateString('de-DE', { month: 'long', year: 'numeric' });
+  const reisemonat = new Date(reise.datum_von).toLocaleDateString('de-DE', {
+    month: 'long', year: 'numeric'
+  });
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-10">
@@ -102,9 +106,13 @@ export default function ReiseDetailClient() {
         )}
         <div className="flex flex-wrap gap-2">
           <span className="chip chip-teal">📅 {reisemonat}</span>
+          <span className="chip chip-teal">⏱️ {dauer} Tage</span>
           <span className="chip chip-teal">👨‍👩‍👧 {reise.personen_anzahl} Personen</span>
           {reise.kinder_alter_min !== null && (
-            <span className="chip chip-green">👶 Kinder ab {reise.kinder_alter_min} J.{reise.kinder_alter_max ? ` bis ${reise.kinder_alter_max} J.` : ''}</span>
+            <span className="chip chip-green">
+              👶 Kinder ab {reise.kinder_alter_min} J.
+              {reise.kinder_alter_max ? ` bis ${reise.kinder_alter_max} J.` : ''}
+            </span>
           )}
           {reise.jahreszeit && (
             <span className="chip chip-amber">🌤️ {reise.jahreszeit}</span>
@@ -124,7 +132,9 @@ export default function ReiseDetailClient() {
           { wert: centZuEuro(reise.gesamtkosten_cent), label: 'Gesamtkosten', gruen: true },
         ].map(k => (
           <div key={k.label} className="card p-4 text-center">
-            <p className={`text-xl font-semibold ${k.gruen ? 'text-emerald-500' : 'text-gray-900'}`}>{k.wert}</p>
+            <p className={`text-xl font-semibold ${k.gruen ? 'text-emerald-500' : 'text-gray-900'}`}>
+              {k.wert}
+            </p>
             <p className="text-xs text-gray-400 mt-1">{k.label}</p>
           </div>
         ))}
@@ -136,15 +146,21 @@ export default function ReiseDetailClient() {
           {/* Karte */}
           <div className="card overflow-hidden">
             <div className="h-72 sm:h-96">
-              <ReiseKarte etappen={etappen} aktiveEtappe={aktiveEtappe} onEtappeClick={setAktiveEtappe} />
+              <ReiseKarte
+                etappen={etappen}
+                aktiveEtappe={aktiveEtappe}
+                onEtappeClick={setAktiveEtappe}
+              />
             </div>
           </div>
 
           {/* Gesamtkommentar */}
           {(reise as any).gesamtkommentar && (
             <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-5">
-              <h3 className="font-semibold text-emerald-900 mb-2">Fazit der Reise</h3>
-              <p className="text-emerald-800 text-sm leading-relaxed">{(reise as any).gesamtkommentar}</p>
+              <h3 className="font-semibold text-emerald-900 mb-2">💬 Fazit der Reise</h3>
+              <p className="text-emerald-800 text-sm leading-relaxed">
+                {(reise as any).gesamtkommentar}
+              </p>
             </div>
           )}
 
@@ -171,28 +187,43 @@ export default function ReiseDetailClient() {
         <div>
           <div className="card p-5 sticky top-20">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Kostenübersicht</h2>
+
+            {/* Sicht-Umschalter */}
             <div className="flex rounded-xl overflow-hidden border border-gray-200 mb-4 text-xs">
               {(['gesamt', 'pro_person', 'pro_tag'] as KostenSicht[]).map(s => (
                 <button key={s} onClick={() => setKostenSicht(s)}
                   className={`flex-1 py-2 transition-colors ${
-                    kostenSicht === s ? 'bg-emerald-500 text-white font-medium' : 'text-gray-500 hover:bg-gray-50'
+                    kostenSicht === s
+                      ? 'bg-emerald-500 text-white font-medium'
+                      : 'text-gray-500 hover:bg-gray-50'
                   }`}>
                   {s === 'gesamt' ? 'Gesamt' : s === 'pro_person' ? 'Person' : 'Tag'}
                 </button>
               ))}
             </div>
+
+            {/* Kategorien */}
             <div className="space-y-2 mb-4">
               {kostenKategorien.map(k => (
-                <div key={k.label} className="flex justify-between items-center py-1.5 border-b border-gray-50 text-sm">
+                <div key={k.label}
+                  className="flex justify-between items-center py-1.5 border-b border-gray-50 text-sm">
                   <span className="text-gray-500">{k.icon} {k.label}</span>
                   <span className="font-medium text-gray-800">{kostenWert(k.cent)}</span>
                 </div>
               ))}
             </div>
+
             <div className="flex justify-between items-center pt-2 mb-5">
               <span className="font-semibold text-gray-900">Gesamt</span>
-              <span className="text-lg font-bold text-emerald-500">{kostenWert(reise.gesamtkosten_cent)}</span>
+              <span className="text-lg font-bold text-emerald-500">
+                {kostenWert(reise.gesamtkosten_cent)}
+              </span>
             </div>
+
+            {/* Basis: x Tage, y Personen */}
+            <p className="text-xs text-gray-400 text-center mb-4">
+              Basis: {dauer} Tage · {reise.personen_anzahl} Personen
+            </p>
 
             {istErsteller && (
               <a href={`/reise/bearbeiten?id=${reise.id}`}
@@ -211,7 +242,7 @@ export default function ReiseDetailClient() {
   );
 }
 
-// ── Etappen-Karte mit allen Details ──────────────────────────
+// ── Etappen-Karte ─────────────────────────────────────────────
 const VM_ICON: Record<string, string> = {
   Auto: '🚗', Bahn: '🚂', Fahrrad: '🚲', Fähre: '⛴️',
   Flugzeug: '✈️', Bus: '🚌', Fuß: '🚶', Sonstiges: '🚀',
@@ -226,8 +257,12 @@ const UNTERKUNFT_ICON: Record<string, string> = {
 function EtappeKarte({ etappe, nummer, aktiv, onClick }: {
   etappe: Etappe; nummer: number; aktiv: boolean; onClick: () => void;
 }) {
-  const dauer = dauerTage(etappe.datum_von, etappe.datum_bis);
-  const gesamtCent = etappe.kosten_gesamt_cent;
+  const e = etappe as any;
+
+  // Titel: ort_von → ort_bis wenn vorhanden, sonst altes titel-Feld
+  const etappenTitel = (e.ort_von && e.ort_bis)
+    ? `${e.ort_von} → ${e.ort_bis}`
+    : etappe.titel;
 
   return (
     <button onClick={onClick}
@@ -237,21 +272,16 @@ function EtappeKarte({ etappe, nummer, aktiv, onClick }: {
           {nummer}
         </div>
         <div className="flex-1 min-w-0">
-          {/* Titel + Kosten */}
+
+          {/* Titel / Von→Bis */}
           <div className="flex justify-between items-start gap-2 mb-1">
-            <p className="font-semibold text-gray-900">{etappe.titel}</p>
-            {gesamtCent > 0 && (
+            <p className="font-semibold text-gray-900">{etappenTitel}</p>
+            {etappe.kosten_gesamt_cent > 0 && (
               <span className="text-sm font-semibold text-emerald-600 flex-shrink-0">
-                {centZuEuro(gesamtCent)}
+                {centZuEuro(etappe.kosten_gesamt_cent)}
               </span>
             )}
           </div>
-
-          {/* Ort + Dauer */}
-          <p className="text-xs text-gray-400 mb-2">
-            📍 {etappe.ort}
-            {dauer > 0 && ` · ${dauer} ${dauer === 1 ? 'Tag' : 'Tage'}`}
-          </p>
 
           {/* Verkehrsmittel */}
           <div className="flex flex-wrap gap-1 mb-2">
@@ -262,7 +292,7 @@ function EtappeKarte({ etappe, nummer, aktiv, onClick }: {
 
           {/* Unterkunft */}
           {etappe.unterkunft_typ && (
-            <div className="flex items-center gap-1.5 mb-2">
+            <div className="flex items-center gap-1.5 mb-1">
               <span className="text-sm">{UNTERKUNFT_ICON[etappe.unterkunft_typ] ?? '🏠'}</span>
               <span className="text-xs text-gray-600">
                 {etappe.unterkunft_typ}
@@ -282,17 +312,19 @@ function EtappeKarte({ etappe, nummer, aktiv, onClick }: {
             <div className="mt-3 pt-3 border-t border-gray-100 space-y-3">
 
               {/* Kostenaufschlüsselung */}
-              {gesamtCent > 0 && (
+              {etappe.kosten_gesamt_cent > 0 && (
                 <div className="grid grid-cols-2 gap-2">
                   {[
-                    ['🏨', 'Unterkunft', etappe.kosten_unterkunft_cent],
-                    ['🚗', 'Transport',  etappe.kosten_transport_cent],
-                    ['🍽️', 'Verpflegung', etappe.kosten_verpflegung_cent],
-                    ['🎟️', 'Aktivitäten', etappe.kosten_aktivitaeten_cent],
+                    ['🏨', 'Unterkunft',   etappe.kosten_unterkunft_cent],
+                    ['🚗', 'Transport',    etappe.kosten_transport_cent],
+                    ['🍽️', 'Verpflegung',  etappe.kosten_verpflegung_cent],
+                    ['🎟️', 'Aktivitäten',  etappe.kosten_aktivitaeten_cent],
                   ].filter(([,,c]) => (c as number) > 0).map(([icon, label, cent]) => (
                     <div key={label as string} className="bg-gray-50 rounded-lg px-3 py-2">
                       <p className="text-xs text-gray-400">{icon as string} {label as string}</p>
-                      <p className="text-sm font-medium text-gray-700">{centZuEuro(cent as number)}</p>
+                      <p className="text-sm font-medium text-gray-700">
+                        {centZuEuro(cent as number)}
+                      </p>
                     </div>
                   ))}
                 </div>
