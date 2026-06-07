@@ -13,6 +13,7 @@ export default function ProfilPage() {
   const [reisenLaden, setReisenLaden]   = useState(true);
   const [bearbeiten, setBearbeiten]     = useState(false);
   const [name, setName]                 = useState('');
+  const [anzeigename, setAnzeigename]   = useState('');
   const [wohnort, setWohnort]           = useState('');
   const [bio, setBio]                   = useState('');
   const [kinderAnzahl, setKinderAnzahl] = useState('');
@@ -25,6 +26,7 @@ export default function ProfilPage() {
   useEffect(() => {
     if (!profil) return;
     setName(profil.name ?? '');
+    setAnzeigename((profil as any).anzeigename ?? profil.name?.split(' ')[0] ?? '');
     setWohnort(profil.wohnort ?? '');
     setBio(profil.bio ?? '');
     setKinderAnzahl(String(profil.kinder_anzahl ?? ''));
@@ -47,6 +49,12 @@ export default function ProfilPage() {
       name, wohnort: wohnort || null, bio: bio || null,
       kinder_anzahl: kinderAnzahl ? parseInt(kinderAnzahl) : null,
     });
+    // Anzeigename separat speichern
+    if (session) {
+      await supabase.from('users')
+        .update({ anzeigename: anzeigename || name.split(' ')[0] })
+        .eq('id', session.user.id);
+    }
     setBearbeiten(false);
     setGespeichert(true);
     setTimeout(() => setGespeichert(false), 3000);
@@ -63,29 +71,32 @@ export default function ProfilPage() {
     setReisen(prev => prev.filter(r => r.id !== id));
   };
 
-  if (laden || !session) {
-    return <div className="min-h-screen flex items-center justify-center"><div className="animate-spin text-4xl">🗺️</div></div>;
-  }
+  if (laden || !session) return (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="animate-spin text-4xl">🗺️</div>
+    </div>
+  );
 
   const veroeffentlicht = reisen.filter(r => r.veroeffentlicht);
   const entwuerfe       = reisen.filter(r => !r.veroeffentlicht);
+  const anzeigenamePub  = (profil as any)?.anzeigename || profil?.name?.split(' ')[0] || '??';
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-10">
 
-      {/* ── Profil-Header ── */}
+      {/* Profil-Header */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-8">
         <div className="flex flex-col sm:flex-row items-start gap-5">
-          {/* Avatar */}
-          <div className="w-16 h-16 rounded-full bg-teal-100 flex items-center justify-center text-2xl font-bold text-teal-700 flex-shrink-0">
-            {profil?.name?.slice(0, 2).toUpperCase() ?? '??'}
+          <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center text-2xl font-bold text-emerald-700 flex-shrink-0">
+            {anzeigenamePub.slice(0, 2).toUpperCase()}
           </div>
 
           <div className="flex-1 min-w-0">
             {!bearbeiten ? (
               <>
-                <h1 className="text-2xl font-semibold text-gray-900">{profil?.name}</h1>
-                {profil?.wohnort && <p className="text-gray-500 text-sm mt-0.5">📍 {profil.wohnort}</p>}
+                <h1 className="text-2xl font-semibold text-gray-900">{anzeigenamePub}</h1>
+                <p className="text-xs text-gray-400 mt-0.5">Öffentlicher Anzeigename</p>
+                {profil?.wohnort && <p className="text-gray-500 text-sm mt-1">📍 {profil.wohnort}</p>}
                 {profil?.bio && <p className="text-gray-600 text-sm mt-2 leading-relaxed">{profil.bio}</p>}
                 <div className="flex flex-wrap gap-2 mt-3">
                   {profil?.kinder_anzahl && (
@@ -99,32 +110,50 @@ export default function ProfilPage() {
               <div className="space-y-3 w-full">
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-1">Name</label>
-                    <input value={name} onChange={e => setName(e.target.value)} className="eingabe text-sm" />
+                    <label className="block text-xs font-medium text-gray-500 mb-1">
+                      Anzeigename (öffentlich) *
+                    </label>
+                    <input value={anzeigename} onChange={e => setAnzeigename(e.target.value)}
+                      placeholder="z. B. FamilieM" className="eingabe text-sm" />
+                    <p className="text-xs text-gray-400 mt-1">Sichtbar für andere Nutzer</p>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-1">Wohnort</label>
-                    <input value={wohnort} onChange={e => setWohnort(e.target.value)} placeholder="z. B. Hamburg" className="eingabe text-sm" />
+                    <label className="block text-xs font-medium text-gray-500 mb-1">
+                      Echter Name (privat)
+                    </label>
+                    <input value={name} onChange={e => setName(e.target.value)}
+                      className="eingabe text-sm" />
+                    <p className="text-xs text-gray-400 mt-1">Nur für dich sichtbar</p>
                   </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Wohnort</label>
+                  <input value={wohnort} onChange={e => setWohnort(e.target.value)}
+                    placeholder="z. B. Osnabrück" className="eingabe text-sm" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">Über mich</label>
-                  <textarea value={bio} onChange={e => setBio(e.target.value)} rows={2} placeholder="Kurze Vorstellung …" className="eingabe text-sm resize-none" />
+                  <textarea value={bio} onChange={e => setBio(e.target.value)}
+                    rows={2} placeholder="Kurze Vorstellung..." className="eingabe text-sm resize-none" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">Anzahl Kinder</label>
-                  <input type="number" min="0" max="10" value={kinderAnzahl} onChange={e => setKinderAnzahl(e.target.value)} placeholder="0" className="eingabe text-sm w-24" />
+                  <input type="number" min="0" max="10" value={kinderAnzahl}
+                    onChange={e => setKinderAnzahl(e.target.value)}
+                    placeholder="0" className="eingabe text-sm w-24" />
                 </div>
               </div>
             )}
           </div>
 
-          {/* Aktionen */}
           <div className="flex flex-col gap-2 flex-shrink-0">
             {!bearbeiten ? (
               <>
                 <button onClick={() => setBearbeiten(true)} className="btn-ghost text-sm">✏️ Bearbeiten</button>
-                <button onClick={() => { signOut(); router.push('/'); }} className="text-sm text-red-400 hover:text-red-600 text-left transition-colors">Abmelden</button>
+                <button onClick={() => { signOut(); router.push('/'); }}
+                  className="text-sm text-red-400 hover:text-red-600 transition-colors">
+                  Abmelden
+                </button>
               </>
             ) : (
               <>
@@ -136,19 +165,19 @@ export default function ProfilPage() {
         </div>
 
         {gespeichert && (
-          <div className="mt-4 bg-teal-50 border border-teal-100 text-teal-700 text-sm rounded-xl px-4 py-2.5">
+          <div className="mt-4 bg-emerald-50 border border-emerald-100 text-emerald-700 text-sm rounded-xl px-4 py-2.5">
             ✅ Profil gespeichert!
           </div>
         )}
       </div>
 
-      {/* ── Neue Reise Button ── */}
+      {/* Meine Reisen */}
       <div className="flex items-center justify-between mb-5">
         <h2 className="text-xl font-semibold text-gray-900">Meine Reisen</h2>
         <a href="/reise/neu" className="btn-primary text-sm">+ Neue Reise</a>
       </div>
 
-      {/* ── Entwürfe ── */}
+      {/* Entwürfe */}
       {entwuerfe.length > 0 && (
         <div className="mb-8">
           <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-2">
@@ -159,12 +188,16 @@ export default function ProfilPage() {
             {entwuerfe.map(r => (
               <ReiseZeile key={r.id} reise={r}
                 aktionen={
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-wrap">
+                    <a href={`/reise/bearbeiten?id=${r.id}`} className="btn-ghost text-xs px-3 py-1.5">✏️ Bearbeiten</a>
                     <button onClick={() => reiseVeroeffentlichen(r.id)} className="btn-primary text-xs px-3 py-1.5">
                       🌍 Veröffentlichen
                     </button>
                     <a href={`/reise/${r.id}`} className="btn-ghost text-xs px-3 py-1.5">Ansehen</a>
-                    <button onClick={() => reiseLoeschen(r.id)} className="text-xs text-red-400 hover:text-red-600 transition-colors">Löschen</button>
+                    <button onClick={() => reiseLoeschen(r.id)}
+                      className="text-xs text-red-400 hover:text-red-600 transition-colors">
+                      Löschen
+                    </button>
                   </div>
                 }
               />
@@ -173,7 +206,7 @@ export default function ProfilPage() {
         </div>
       )}
 
-      {/* ── Veröffentlichte Reisen ── */}
+      {/* Veröffentlicht */}
       {reisenLaden ? (
         <div className="space-y-3">
           {[1,2,3].map(i => <div key={i} className="h-24 bg-gray-100 rounded-2xl animate-pulse" />)}
@@ -187,16 +220,20 @@ export default function ProfilPage() {
       ) : veroeffentlicht.length > 0 && (
         <div>
           <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-teal-400 inline-block"></span>
+            <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block"></span>
             Veröffentlicht ({veroeffentlicht.length})
           </h3>
           <div className="space-y-3">
             {veroeffentlicht.map(r => (
               <ReiseZeile key={r.id} reise={r}
                 aktionen={
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-wrap">
+                    <a href={`/reise/bearbeiten?id=${r.id}`} className="btn-ghost text-xs px-3 py-1.5">✏️ Bearbeiten</a>
                     <a href={`/reise/${r.id}`} className="btn-ghost text-xs px-3 py-1.5">Ansehen</a>
-                    <button onClick={() => reiseLoeschen(r.id)} className="text-xs text-red-400 hover:text-red-600 transition-colors">Löschen</button>
+                    <button onClick={() => reiseLoeschen(r.id)}
+                      className="text-xs text-red-400 hover:text-red-600 transition-colors">
+                      Löschen
+                    </button>
                   </div>
                 }
               />
@@ -208,9 +245,10 @@ export default function ProfilPage() {
   );
 }
 
-// ── Reise-Zeile ───────────────────────────────────────────────
 function ReiseZeile({ reise, aktionen }: { reise: Reise; aktionen: React.ReactNode }) {
-  const dauer = dauerTage(reise.datum_von, reise.datum_bis);
+  const reisemonat = new Date(reise.datum_von).toLocaleDateString('de-DE', {
+    month: 'long', year: 'numeric'
+  });
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex flex-col sm:flex-row sm:items-center gap-3">
       <div className="flex-1 min-w-0">
@@ -222,7 +260,7 @@ function ReiseZeile({ reise, aktionen }: { reise: Reise; aktionen: React.ReactNo
           }`}>{reise.preisstufe}</span>
         </div>
         <p className="text-xs text-gray-400">
-          {reise.datum_von.slice(0,4)} · {dauer} Tage · {reise.personen_anzahl} Personen
+          {reisemonat} · {reise.personen_anzahl} Personen
           {reise.kinder_alter_min !== null && ` · ab ${reise.kinder_alter_min} J.`}
           {' · '}<span className="font-medium text-gray-600">{centZuEuro(reise.gesamtkosten_cent)}</span>
         </p>
