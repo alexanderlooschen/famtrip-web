@@ -80,7 +80,7 @@ export default function ReiseBearbeitenClient() {
   const [personen, setPersonen]         = useState('2');
   const [kinderMin, setKinderMin]       = useState('');
   const [kinderMax, setKinderMax]       = useState('');
-  const [jahreszeit, setJahreszeit]     = useState('');
+  
 
   useEffect(() => {
     if (!reiseId) return;
@@ -97,7 +97,7 @@ export default function ReiseBearbeitenClient() {
         setPersonen(String(d.personen_anzahl));
         setKinderMin(d.kinder_alter_min !== null ? String(d.kinder_alter_min) : '');
         setKinderMax(d.kinder_alter_max !== null ? String(d.kinder_alter_max) : '');
-        setJahreszeit(d.jahreszeit ?? '');
+        
         if (d.datum_von) {
           const dt = new Date(d.datum_von);
           setMonat(String(dt.getMonth() + 1));
@@ -266,18 +266,12 @@ export default function ReiseBearbeitenClient() {
                 onChange={e => setKinderMax(e.target.value)} placeholder="12" className="eingabe" />
             </Feld>
           </div>
-          <Feld label="Jahreszeit">
-            <div className="flex gap-2 flex-wrap">
-              {JAHRESZEITEN.map(j => (
-                <button key={j} type="button"
-                  onClick={() => setJahreszeit(prev => prev === j ? '' : j)}
-                  className={`px-4 py-2 rounded-xl text-sm border transition-all ${
-                    jahreszeit === j ? 'bg-emerald-500 text-white border-emerald-500'
-                      : 'bg-white text-gray-600 border-gray-200'
-                  }`}>{j}</button>
-              ))}
-            </div>
-          </Feld>
+          <div className="bg-gray-50 rounded-xl px-4 py-3 border border-gray-100 text-sm text-gray-600 flex items-center gap-2">
+            <span className="text-lg">
+              {{'Frühling':'🌸','Sommer':'☀️','Herbst':'🍂','Winter':'❄️'}[monatZuJahreszeit(parseInt(monat))] ?? '📅'}
+            </span>
+            <span>Jahreszeit: <strong>{monatZuJahreszeit(parseInt(monat))}</strong> (automatisch aus Monat)</span>
+          </div>
           <button onClick={basisSpeichern} className="btn-primary w-full py-3">
             Basisdaten speichern
           </button>
