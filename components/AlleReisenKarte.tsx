@@ -101,7 +101,7 @@ export default function AlleReisenKarte({ reisen, onReiseClick }: Props) {
             <div style={{ minWidth: 180 }}>
               <p style={{ fontWeight: 600, marginBottom: 4, fontSize: 14 }}>{reise.titel}</p>
               <p style={{ fontSize: 12, color: '#6B7280', marginBottom: 4 }}>
-                {dauerTage(reise.datum_von, reise.datum_bis)} Tage
+                {(reise as any).dauer_tage ?? dauerTage(reise.datum_von, reise.datum_bis)} Tage
                 {reise.kinder_alter_min !== null ? ` · ab ${reise.kinder_alter_min} J.` : ''}
               </p>
               <p style={{ fontSize: 13, fontWeight: 600, color: '#059669', marginBottom: 8 }}>
