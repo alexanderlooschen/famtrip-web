@@ -92,3 +92,12 @@ export function monatZuJahreszeit(monat: number): string {
   return "Herbst";
 }
 
+
+export const ALTERSGRUPPEN = [
+  { id: "kleinkind",    label: "Kleinkind",        icon: "👶", alter: "0–3 Jahre" },
+  { id: "kindergarten", label: "Kindergartenkind",  icon: "🧒", alter: "4–6 Jahre" },
+  { id: "grundschule",  label: "Grundschulkind",    icon: "🏫", alter: "7–10 Jahre" },
+  { id: "aeltere",      label: "Ältere Kinder",     icon: "🎒", alter: "11–14 Jahre" },
+  { id: "teenager",     label: "Teenager",          icon: "🧑", alter: "15+ Jahre" },
+];
+

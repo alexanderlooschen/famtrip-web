@@ -1,6 +1,8 @@
 // components/ReiseBearbeitenClient.tsx
 'use client';
 
+import AltersgruppenAuswahl from './AltersgruppenAuswahl';
+
 function monatZuJahreszeit(monat: number): string {
   if ([12,1,2].includes(monat))  return 'Winter';
   if ([3,4,5].includes(monat))   return 'Frühling';
@@ -79,8 +81,7 @@ export default function ReiseBearbeitenClient() {
   const [jahr, setJahr]                 = useState(String(new Date().getFullYear()));
   const [dauerTage, setDauerTage]       = useState('');
   const [personen, setPersonen]         = useState('2');
-  const [kinderMin, setKinderMin]       = useState('');
-  const [kinderMax, setKinderMax]       = useState('');
+  const [altersgruppen, setAltersgruppen] = useState<string[]>([]);
   
 
   useEffect(() => {
@@ -96,8 +97,7 @@ export default function ReiseBearbeitenClient() {
         setBeschreibung(d.beschreibung ?? '');
         setGesamtkommentar((d as any).gesamtkommentar ?? '');
         setPersonen(String(d.personen_anzahl));
-        setKinderMin(d.kinder_alter_min !== null ? String(d.kinder_alter_min) : '');
-        setKinderMax(d.kinder_alter_max !== null ? String(d.kinder_alter_max) : '');
+        setAltersgruppen((d as any).altersgruppen ?? []);
         
         setDauerTage((d as any).dauer_tage ? String((d as any).dauer_tage) : '');
         if (d.datum_von) {
@@ -126,8 +126,9 @@ export default function ReiseBearbeitenClient() {
       datum_von: datumVon, datum_bis: datumBis,
       dauer_tage: dauerTage ? parseInt(dauerTage) : null,
       personen_anzahl: parseInt(personen) || 2,
-      kinder_alter_min: kinderMin ? parseInt(kinderMin) : null,
-      kinder_alter_max: kinderMax ? parseInt(kinderMax) : null,
+      altersgruppen,
+      kinder_alter_min: null,
+      kinder_alter_max: null,
       jahreszeit: monatZuJahreszeit(parseInt(monat)),
     }).eq('id', reiseId);
 
@@ -260,20 +261,16 @@ export default function ReiseBearbeitenClient() {
               placeholder="z. B. 4" className="eingabe w-32" />
             <p className="text-xs text-gray-400 mt-1">Für korrekte Kosten-pro-Tag Berechnung</p>
           </Feld>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 gap-4">
             <Feld label="Personen">
               <input type="number" min="1" value={personen}
-                onChange={e => setPersonen(e.target.value)} className="eingabe" />
-            </Feld>
-            <Feld label="Kinder ab (J.)">
-              <input type="number" min="0" value={kinderMin}
-                onChange={e => setKinderMin(e.target.value)} placeholder="0" className="eingabe" />
-            </Feld>
-            <Feld label="Kinder bis (J.)">
-              <input type="number" min="0" value={kinderMax}
-                onChange={e => setKinderMax(e.target.value)} placeholder="12" className="eingabe" />
+                onChange={e => setPersonen(e.target.value)} className="eingabe w-24" />
             </Feld>
           </div>
+          <AltersgruppenAuswahl
+            ausgewaehlt={altersgruppen}
+            onChange={setAltersgruppen}
+          />
           <div className="bg-gray-50 rounded-xl px-4 py-3 border border-gray-100 text-sm text-gray-600 flex items-center gap-2">
             <span className="text-lg">
               {{'Frühling':'🌸','Sommer':'☀️','Herbst':'🍂','Winter':'❄️'}[monatZuJahreszeit(parseInt(monat))] ?? '📅'}

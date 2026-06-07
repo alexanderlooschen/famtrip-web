@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
+import AltersgruppenAuswahl from './AltersgruppenAuswahl';
 
 type Schritt = 'basis' | 'etappe' | 'fertig';
 
@@ -77,8 +78,7 @@ export default function ReiseNeuClient() {
   const [jahr, setJahr]                 = useState(String(new Date().getFullYear()));
   const [dauerTageVal, setDauerTageVal] = useState('');
   const [personen, setPersonen]         = useState('2');
-  const [kinderMin, setKinderMin]       = useState('');
-  const [kinderMax, setKinderMax]       = useState('');
+  const [altersgruppen, setAltersgruppen] = useState<string[]>([]);
   const [etappen, setEtappen]           = useState<EtappeFormular[]>([leerEtappe()]);
 
   // Jahreszeit automatisch aus Monat
@@ -113,8 +113,9 @@ export default function ReiseNeuClient() {
       datum_bis:        datumBis,
       dauer_tage:       dauerTageVal ? parseInt(dauerTageVal) : null,
       personen_anzahl:  parseInt(personen) || 2,
-      kinder_alter_min: kinderMin ? parseInt(kinderMin) : null,
-      kinder_alter_max: kinderMax ? parseInt(kinderMax) : null,
+      altersgruppen,
+      kinder_alter_min: null,
+      kinder_alter_max: null,
       jahreszeit,                         // automatisch berechnet
       veroeffentlicht:  false,
     }).select('id').single();
@@ -275,16 +276,12 @@ export default function ReiseNeuClient() {
               <input type="number" min="1" max="20" value={personen}
                 onChange={e => setPersonen(e.target.value)} className="eingabe" />
             </Feld>
-            <Feld label="Kinder ab (J.)">
-              <input type="number" min="0" max="17" value={kinderMin}
-                onChange={e => setKinderMin(e.target.value)} placeholder="0" className="eingabe" />
-            </Feld>
           </div>
 
-          <Feld label="Kinder bis (J.)">
-            <input type="number" min="0" max="17" value={kinderMax}
-              onChange={e => setKinderMax(e.target.value)} placeholder="12" className="eingabe w-1/3" />
-          </Feld>
+          <AltersgruppenAuswahl
+            ausgewaehlt={altersgruppen}
+            onChange={setAltersgruppen}
+          />
 
           <button onClick={basisSpeichern} disabled={laden}
             className="btn-primary w-full py-3 text-base">

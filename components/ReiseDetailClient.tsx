@@ -142,7 +142,15 @@ export default function ReiseDetailClient() {
           </span>
           <span className="chip chip-teal">⏱️ {dauer} Tage</span>
           <span className="chip chip-teal">👨‍👩‍👧 {reise.personen_anzahl} Personen</span>
-          {reise.kinder_alter_min !== null && (
+          {((reise as any).altersgruppen?.length > 0) && (
+            <span className="chip chip-green">
+              👶 {(reise as any).altersgruppen.map((g: string) => ({
+                kleinkind: 'Kleinkind', kindergarten: 'Kiga-Kind',
+                grundschule: 'Grundschule', aeltere: 'Ältere', teenager: 'Teenager'
+              }[g] ?? g)).join(', ')}
+            </span>
+          )}
+          {!((reise as any).altersgruppen?.length > 0) && reise.kinder_alter_min !== null && (
             <span className="chip chip-green">
               👶 Kinder ab {reise.kinder_alter_min} J.
               {reise.kinder_alter_max ? ` bis ${reise.kinder_alter_max} J.` : ''}
