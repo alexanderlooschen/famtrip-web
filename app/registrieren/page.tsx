@@ -96,7 +96,7 @@ export default function RegistrierenPage() {
             {/* Name – privat */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Echter Name <span className="text-gray-400 font-normal">(optional)</span>
+                Name <span className="text-gray-400 font-normal">(optional)</span>
               </label>
               <input
                 type="text" value={name}
@@ -105,7 +105,7 @@ export default function RegistrierenPage() {
                 className="eingabe"
               />
               <p className="text-xs text-gray-400 mt-1">
-                🔒 Privat – nur für dich sichtbar, nie öffentlich angezeigt
+                🔒 Nur für dich sichtbar – wird nie öffentlich angezeigt
               </p>
             </div>
 
@@ -117,6 +117,9 @@ export default function RegistrierenPage() {
                 placeholder="du@beispiel.de"
                 className="eingabe"
               />
+              <p className="text-xs text-gray-400 mt-1">
+                🔒 Nur für dich sichtbar – wird nie öffentlich angezeigt
+              </p>
             </div>
 
             <div>
