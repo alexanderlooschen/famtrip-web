@@ -132,8 +132,7 @@ export default function ReiseBearbeitenClient() {
     }).eq('id', reiseId);
 
     if (error) { setFehler(error.message); return; }
-    setErfolg('Basisdaten gespeichert!');
-    setTimeout(() => setErfolg(''), 3000);
+    router.push(`/reise/${reiseId}`);
   };
 
   const etappeSpeichern = async (idx: number) => {
