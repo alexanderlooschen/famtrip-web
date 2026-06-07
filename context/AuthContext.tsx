@@ -21,7 +21,7 @@ interface AuthCtx {
   profil: Profil | null;
   laden: boolean;
   signIn:  (email: string, passwort: string) => Promise<string | null>;
-  signUp:  (email: string, passwort: string, name: string) => Promise<string | null>;
+  signUp:  (email: string, passwort: string, name: string, anzeigename?: string) => Promise<string | null>;
   signOut: () => Promise<void>;
   profilAktualisieren: (daten: Partial<Profil>) => Promise<void>;
 }
@@ -60,9 +60,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return error?.message ?? null;
   };
 
-  const signUp = async (email: string, passwort: string, name: string) => {
+  const signUp = async (email: string, passwort: string, name: string, anzeigename?: string) => {
     const { error } = await supabase.auth.signUp({
-      email, password: passwort, options: { data: { name } },
+      email, password: passwort, options: { data: { name, anzeigename: anzeigename || name.split(' ')[0] } },
     });
     return error?.message ?? null;
   };
