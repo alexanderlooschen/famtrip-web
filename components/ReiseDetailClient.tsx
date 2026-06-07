@@ -7,6 +7,7 @@ import dynamic from 'next/dynamic';
 import { supabase, Reise, Etappe, centZuEuro, dauerTage } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import Kommentare from './Kommentare';
+import Bewertung from './Bewertung';
 
 // Dynamische Imports (kein SSR)
 const ReiseKarte = dynamic(() => import('./ReiseKarte'),  { ssr: false });
@@ -220,6 +221,21 @@ export default function ReiseDetailClient() {
               className="mt-4 block border-2 border-dashed border-emerald-200 hover:border-emerald-400 rounded-xl p-4 text-center text-sm text-emerald-500 hover:text-emerald-700 transition-colors">
               + Etappe ergänzen
             </a>
+          </div>
+
+          {/* Bewertungen */}
+          <div className="card p-5">
+            <Bewertung
+              reiseId={reise.id}
+              erstellerId={reise.ersteller_id}
+              onBewertungChange={(schnitt, anzahl) => {
+                setReise(prev => prev ? {
+                  ...prev,
+                  bewertung_schnitt: schnitt,
+                  bewertung_anzahl: anzahl,
+                } : null);
+              }}
+            />
           </div>
 
           {/* Kommentare */}
