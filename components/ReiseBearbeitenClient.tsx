@@ -77,6 +77,7 @@ export default function ReiseBearbeitenClient() {
   const [gesamtkommentar, setGesamtkommentar] = useState('');
   const [monat, setMonat]               = useState('1');
   const [jahr, setJahr]                 = useState(String(new Date().getFullYear()));
+  const [dauerTage, setDauerTage]       = useState('');
   const [personen, setPersonen]         = useState('2');
   const [kinderMin, setKinderMin]       = useState('');
   const [kinderMax, setKinderMax]       = useState('');
@@ -98,6 +99,7 @@ export default function ReiseBearbeitenClient() {
         setKinderMin(d.kinder_alter_min !== null ? String(d.kinder_alter_min) : '');
         setKinderMax(d.kinder_alter_max !== null ? String(d.kinder_alter_max) : '');
         
+        setDauerTage((d as any).dauer_tage ? String((d as any).dauer_tage) : '');
         if (d.datum_von) {
           const dt = new Date(d.datum_von);
           setMonat(String(dt.getMonth() + 1));
@@ -122,6 +124,7 @@ export default function ReiseBearbeitenClient() {
       titel, beschreibung: beschreibung || null,
       gesamtkommentar: gesamtkommentar || null,
       datum_von: datumVon, datum_bis: datumBis,
+      dauer_tage: dauerTage ? parseInt(dauerTage) : null,
       personen_anzahl: parseInt(personen) || 2,
       kinder_alter_min: kinderMin ? parseInt(kinderMin) : null,
       kinder_alter_max: kinderMax ? parseInt(kinderMax) : null,
@@ -252,6 +255,12 @@ export default function ReiseBearbeitenClient() {
               </select>
             </Feld>
           </div>
+          <Feld label="Reisedauer (Tage) *">
+            <input type="number" min="1" max="365" value={dauerTage}
+              onChange={e => setDauerTage(e.target.value)}
+              placeholder="z. B. 4" className="eingabe w-32" />
+            <p className="text-xs text-gray-400 mt-1">Für korrekte Kosten-pro-Tag Berechnung</p>
+          </Feld>
           <div className="grid grid-cols-3 gap-4">
             <Feld label="Personen">
               <input type="number" min="1" value={personen}
